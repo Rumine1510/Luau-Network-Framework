@@ -89,7 +89,7 @@ As you can see, using this network module pass way less data than remote event w
 ## Passing data at lower rate
 
 ### Single remote event with identification key and small data
-Send kbPS: 1.2e+0.4
+Send kbPS: 1.2e+04
 ![image](https://user-images.githubusercontent.com/105923121/202165769-bc749d01-1918-43eb-9155-9f752427c97b.png)
 
 ### Multiple remote event with small data
