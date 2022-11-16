@@ -10,9 +10,9 @@ be more efficient than using multiple remotes when the data used by the key is l
 
 To check the amount of data sent between the client and server, you can use the performance tab in the studio.
 
-### Usage Example:
+## Usage Example:
 
-#### server
+### Server
 ```lua
 local NetworkModule = require(game.ReplicatedStorage.NetworkModule)
 
@@ -32,7 +32,7 @@ signal2:Connect(function()
 end)
 ```
 
-#### client
+### Client
 ```lua
 local NetworkModule = require(game.ReplicatedStorage.NetworkModule)
 
@@ -52,7 +52,7 @@ print(something)
 network.Events.Signal1:Fire(signalParams, "Hello")
 ```
 
-#### output
+### output
 ```lua
 This Work -- client
 Bye -- server
