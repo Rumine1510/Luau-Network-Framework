@@ -683,6 +683,11 @@ end
 --// Network Methods
 
 
+function NetworkPrototype.newSignalParams()
+    return Signal.newParams()
+end
+
+
 function NetworkPrototype:CreateSignal(eventName: string, params : signalParams?, eventID: number?): customSignal
 
 	assert(type(self) == "table" and Identifiers[self], "Expected ':' not '.' calling member function Register")
