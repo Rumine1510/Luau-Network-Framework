@@ -65,7 +65,7 @@ Hello -- server
 There are a lot more API but since this is a private module, I will just cover the basic one. Maybe I'll add more info later.
 In the future, this module might be public but currently, it seems too messy and I will probably have to improve it first.
 
-Oh, here are some stats from the performance tab about the data being sent between client-server in case you want to check it out.
+Oh, and here are some stats from the performance tab about the data being sent between client-server in case you want to check it out.
 
 ## Single remote event with identification key
 ![image](https://user-images.githubusercontent.com/105923121/202156149-5b55227f-5874-451c-bacd-bf21b03f7351.png)
