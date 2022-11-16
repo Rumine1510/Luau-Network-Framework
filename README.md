@@ -1,4 +1,4 @@
-# NetworkModule
+# Network Framework
 
 This is a network module designed to **simplify and improve communication between client-server**.
 This module also allows for **local communication**, and will **eliminate the need to create remote instances yourself**.
