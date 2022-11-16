@@ -17,18 +17,18 @@ To check the amount of data sent between the client and server, you can use the 
 ```lua
 local NetworkModule = require(game.ReplicatedStorage.NetworkModule)
 
-local network = NetworkModule.Register("TestNetwork"):Init()
+local network = NetworkModule.Register("TestNetwork"):Init() -- creating TestNetwork and Initialising it.
 
-network:CreateSignal("Signal1"):Connect(print)
+network:CreateSignal("Signal1"):Connect(print) -- creating a signal and connect it to print function
 
-network.Events.Signal1.OnInvoke = function(data)
+network.Events.Signal1.OnInvoke = function(data) -- adding OnInvoke function to Signal1
     print(data)
     return "Received"
 end
 
-local signal2 = network:CreateSignal("Signal2")
+local signal2 = network:CreateSignal("Signal2") -- creating another signal
 
-signal2:Connect(function()
+signal2:Connect(function() -- connecting it to a function
     print("Work")
 end)
 ```
@@ -37,20 +37,20 @@ end)
 ```lua
 local NetworkModule = require(game.ReplicatedStorage.NetworkModule)
 
-local network = NetworkModule.WaitForNetwork("TestNetwork"):Init()
+local network = NetworkModule.WaitForNetwork("TestNetwork"):Init() -- Getting TestNetwork and initialising it for client.
 
-local signalParams = network.newSignalParams() -- optional, you can also pass in nil for default params
+local signalParams = network.newSignalParams() -- Optional, you can also pass in nil for default parameter.
 
-network.Events.Signal2:Connect(function()
+network.Events.Signal2:Connect(function() -- Signal created from the server will exist for client.
     print("This work")
 end)
 
-network:FireSignal("Signal2") -- this also work
+network:FireSignal("Signal2") -- Firing signal to server, there are multiple way to do this.
 
-local something = network.Events.Signal1:Invoke(nil, "Bye")
-print(something)
+local something = network.Events.Signal1:Invoke(nil, "Bye") -- Using nil instead of signalParams will be default parameter.
+print(something) -- value returned from server
 
-network.Events.Signal1:Fire(signalParams, "Hello")
+network.Events.Signal1:Fire(signalParams, "Hello") -- Firing signal to server with argument being "Hello".
 ```
 
 ### output
