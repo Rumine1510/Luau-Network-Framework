@@ -68,17 +68,21 @@ In the future, this module might be public but currently, it seems too messy and
 Oh, and here are some stats from the performance tab about the data being sent between client-server in case you want to check it out.
 
 ## Single remote event with identification key
+Send kBps: 6.18e+03
 ![image](https://user-images.githubusercontent.com/105923121/202156149-5b55227f-5874-451c-bacd-bf21b03f7351.png)
 
 ## Network module
+Send kBps: 761
 ![image](https://user-images.githubusercontent.com/105923121/202156237-fec4e4cc-0422-4b75-8783-6ac9ce570c16.png)
 
 
 
 ## Multiple remote event with data
+Send kBps: 1.1e+04
 ![image](https://user-images.githubusercontent.com/105923121/202156331-01ee7c7f-dca0-44e1-9640-11cdefe68548.png)
 
 ## Network module with data
+Send kBps: 9.71e+03
 ![image](https://user-images.githubusercontent.com/105923121/202156509-aae4c162-a33e-4869-aa45-ab408a4917d6.png)
 
 So, in conclusion about the performance:
