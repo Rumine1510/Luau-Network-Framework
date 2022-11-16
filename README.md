@@ -19,6 +19,8 @@ local NetworkModule = require(game.ReplicatedStorage.NetworkModule)
 
 local network = NetworkModule.Register("TestNetwork"):Init() -- creating TestNetwork and Initialising it.
 
+local signalParams = network.newSignalParams() -- Optional, you can pass this in as a second argument in CreateSignal method but I won't be covering that.
+
 network:CreateSignal("Signal1"):Connect(print) -- creating a signal and connect it to print function
 
 network.Events.Signal1.OnInvoke = function(data) -- adding OnInvoke function to Signal1
@@ -39,18 +41,16 @@ local NetworkModule = require(game.ReplicatedStorage.NetworkModule)
 
 local network = NetworkModule.WaitForNetwork("TestNetwork"):Init() -- Getting TestNetwork and initialising it for client.
 
-local signalParams = network.newSignalParams() -- Optional, you can also pass in nil for default parameter.
-
-network.Events.Signal2:Connect(function() -- Signal created from the server will exist for client.
+network.Events.Signal2:Connect(function() -- Signal created from the server will exist for client, this behavior can be changed with signalParams.
     print("This work")
 end)
 
 network:FireSignal("Signal2") -- Firing signal to server, there are multiple way to do this.
 
-local something = network.Events.Signal1:Invoke(nil, "Bye") -- Using nil instead of signalParams will be default parameter.
+local something = network.Events.Signal1:Invoke("Bye") -- Invoking server with "Bye" as an argument
 print(something) -- value returned from server
 
-network.Events.Signal1:Fire(signalParams, "Hello") -- Firing signal to server with argument being "Hello".
+network.Events.Signal1:Fire("Hello") -- Firing signal to server with argument being "Hello".
 ```
 
 ### output
