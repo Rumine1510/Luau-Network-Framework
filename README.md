@@ -60,7 +60,7 @@ print(something) -- value returned from server
 network.Events.Signal1:Fire(nil, "Hello") -- Firing signal to server with argument being "Hello". Passing nil for default signal property.
 ```
 
-### output
+### Output
 ```lua
 This Work -- client
 Bye -- server
