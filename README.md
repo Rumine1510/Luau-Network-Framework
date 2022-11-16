@@ -47,10 +47,10 @@ end)
 
 network:FireSignal("Signal2") -- Firing signal to server, there are multiple way to do this.
 
-local something = network.Events.Signal1:Invoke("Bye") -- Invoking server with "Bye" as an argument
+local something = network.Events.Signal1:Invoke(nil, "Bye") -- Invoking server with "Bye" as an argument. Passing nil for default signal property.
 print(something) -- value returned from server
 
-network.Events.Signal1:Fire("Hello") -- Firing signal to server with argument being "Hello".
+network.Events.Signal1:Fire(nil, "Hello") -- Firing signal to server with argument being "Hello". Passing nil for default signal property.
 ```
 
 ### output
