@@ -74,6 +74,8 @@ In the future, this module might be public but currently, it seems too messy and
 
 Oh, and here are some stats from the performance tab about the data being sent between client-server in case you want to check it out.
 
+## Passing data at high rate
+
 ### Single remote event with identification key
 Send kBps: 6.18e+03
 ![image](https://user-images.githubusercontent.com/105923121/202156149-5b55227f-5874-451c-bacd-bf21b03f7351.png)
@@ -84,7 +86,7 @@ Send kBps: 761
 
 As you can see, using this network module pass way less data than remote event when firing at high rate.
 
-## Passing data with lower rate
+## Passing data at lower rate
 
 ### Single remote event with identification key and small data
 Send kbPS: 1.2e+0.4
