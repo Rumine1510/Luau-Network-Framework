@@ -1,6 +1,6 @@
-# LuauNetworkModule
+# NetworkModule
 
-A network module designed to **simplify and improve communication between client-server**.
+This is a network module designed to **simplify and improve communication between client-server**.
 This module also allows for **local communication**, and will **eliminate the need to create remote instances yourself**.
 
 This module will **lower the amount of bandwidth** used when communicating between client-server when using it instead of RemoteEvent.
