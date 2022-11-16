@@ -3,6 +3,10 @@
 --// Types \\--
 
 type func = (...any) -> (...any)
+type signalProperty = {
+	Target: (Player | {Player} | "All")?,
+	Disconnect: boolean?
+}
 
 --// Services \\--
 
@@ -214,7 +218,7 @@ function Network.Register(name: string?, params: networkParams?, folder: Instanc
 	local newNetwork = {}
 	newNetwork.__Init = Instance.new("BindableEvent") :: boolean | BindableEvent
 	newNetwork.Events = {} :: {[string]: customSignal}
-	newNetwork.RemoteQueue = {} :: {{Key: string, Properties: signalParams, Args: {any}}}
+	newNetwork.RemoteQueue = {} :: {{Key: string, Properties: signalProperty, Args: {any}}}
 
 	if IsServer then
 		newNetwork.ConnectedClient = {} :: {Player}
@@ -300,6 +304,7 @@ function Signal.new(network: network, signalName: string?, signalParams: signalP
 	local newSignal = {}
 	newSignal.Connections = {} :: {(...any) -> (...any)}
 	newSignal.ConnectionList = {} :: {any} --:: {customConnection}
+	newSignal.ThreadList = {} :: {thread}
 	newSignal.Network = network
 	newSignal.Name = Identifier
 	newSignal.ID = signalID
@@ -318,10 +323,11 @@ end
 
 function Signal.newParams(): signalParams
 
-	local params = {}
-	params.Target = nil :: (Player | {Player} | "All")?
+	local signalParams = {}
+	signalParams.Replicate = false :: boolean
+	signalParams.Once = false :: boolean
 
-	return params
+	return signalParams
 
 end
 
@@ -492,7 +498,7 @@ end
 --// Private Methods \\--
 
 
-function NetworkPrototype:__AddQueue(Key: any, properties: signalParams, args: {any})
+function NetworkPrototype.__AddQueue(self: network, Key: any, properties: signalProperty, args: {any})
 
 	if #self.RemoteQueue == 0 then
 		task.defer(self.__ReleaseQueue, self)
@@ -509,7 +515,7 @@ function NetworkPrototype:__AddQueue(Key: any, properties: signalParams, args: {
 end
 
 
-function NetworkPrototype:__ReleaseQueue()
+function NetworkPrototype.__ReleaseQueue(self: network)
 
 	local data = {} :: {[any]: any}
 
@@ -578,7 +584,7 @@ end
 --// Connections Methods
 
 
-function ConnectionMethods:Disconnect(customConnection)
+function ConnectionMethods.Disconnect(self: customConnection)
 
 	local tbl = self.Signal.Connections
 
@@ -601,7 +607,7 @@ end
 --// Signal Methods
 
 
-function SignalMethods:Connect(func: (...any) -> (...any)): customConnection
+function SignalMethods.Connect(self: customSignal, func: (...any) -> (...any)): customConnection
 
 	assert(type(self) == "table", "Expected ':' not '.' calling member function Connect")
 	assert(typeof(func) == "function", "First argument provided must be function.")
@@ -615,7 +621,7 @@ function SignalMethods:Connect(func: (...any) -> (...any)): customConnection
 end
 
 
-function SignalMethods:Disconnect()
+function SignalMethods.Disconnect(self: customSignal)
 
 	for _, connection in self.ConnectionList do
 		connection:Disconnect()
@@ -624,27 +630,27 @@ function SignalMethods:Disconnect()
 end
 
 
-function SignalMethods:Fire( params: signalParams, ...: any)
+function SignalMethods.Fire(self: customSignal, property: signalProperty, ...: any)
 
 	if IsServer then
-		
-		params = params or Signal.newParams()
 
-		if params.Target then
+		property = property or {}
 
-			if type(params.Target) == "table" then
+		if property.Target then
 
-				for _, player in params.Target do
+			if type(property.Target) == "table" then
+
+				for _, player in property.Target do
 					assert(typeof(player) == "Instance" and player:IsA("Player"), "All value in Target must be a player.")
 				end
 
 			else
-				assert(typeof(params.Target) == "Instance" and params.Target:IsA("Player"), "Target must be a player.")
+				assert(typeof(property.Target) == "Instance" and property.Target:IsA("Player"), "Target must be a player.")
 			end
 
 		else	
 
-			params.Target = "All"
+			property.Target = "All"
 
 		end
 
@@ -654,12 +660,18 @@ function SignalMethods:Fire( params: signalParams, ...: any)
 		task.spawn(connection, ...) 
 	end
 
-	self.Network:__AddQueue(self.Key, params, {...})
+	for _, thread in self.ThreadList do
+		task.spawn(thread, ...)
+	end
+	
+	table.clear(self.ThreadList)
+
+	self.Network:__AddQueue(self.Key, property, {...})
 
 end
 
 
-function SignalMethods:Invoke(params: signalParams, ...: any): unknown
+function SignalMethods.Invoke(self: customSignal, property: signalProperty, ...: any): unknown
 
 	if self.OnInvoke then
 		return self.OnInvoke(...)
@@ -667,10 +679,10 @@ function SignalMethods:Invoke(params: signalParams, ...: any): unknown
 
 		if IsServer then
 
-			assert(params, "SignalParams must be provided.")
-			assert(typeof(params.Target) == "Instance" and params.Target:IsA("Player"), "Target must be a player.")
+			assert(property, "SignalProperty must be provided.")
+			assert(typeof(property.Target) == "Instance" and property.Target:IsA("Player"), "Target must be a player.")
 
-			return self.Network.__MainInvoke:InvokeClient(params.Target, self.Key, ...)
+			return self.Network.__MainInvoke:InvokeClient(property.Target, self.Key, ...)
 		else
 			return self.Network.__MainInvoke:InvokeServer(self.Key, ...)
 		end
@@ -680,15 +692,25 @@ function SignalMethods:Invoke(params: signalParams, ...: any): unknown
 end
 
 
+function SignalMethods.Wait(self: customSignal)
+
+	local thread = coroutine.running()
+	table.insert(self.ThreadList, thread)
+
+	return coroutine.yield()
+
+end
+
+
 --// Network Methods
 
 
 function NetworkPrototype.newSignalParams()
-    return Signal.newParams()
+	return Signal.newParams()
 end
 
 
-function NetworkPrototype:CreateSignal(eventName: string, params : signalParams?, eventID: number?): customSignal
+function NetworkPrototype.CreateSignal(self: network, eventName: string, params : signalParams?, eventID: number?): customSignal
 
 	assert(type(self) == "table" and Identifiers[self], "Expected ':' not '.' calling member function Register")
 	assert(typeof(eventName) == "string", "First argument provided must be string.")
@@ -710,18 +732,18 @@ function NetworkPrototype:CreateSignal(eventName: string, params : signalParams?
 end
 
 
-function NetworkPrototype:GetSignal(eventName: string): customSignal?
+function NetworkPrototype.GetSignal(self: network, eventName: string): customSignal?
 	return self.Events[eventName]
 end
 
 
-function NetworkPrototype:GetSignalFromID(signalID: number): customSignal?
+function NetworkPrototype.GetSignalFromID(self: network, signalID: number): customSignal?
 	local signalInfo = self.SignalArray[signalID]
 	return signalInfo and self.Events[signalInfo.EventName]
 end
 
 
-function NetworkPrototype:WaitForSignal(eventName: string): customSignal
+function NetworkPrototype.WaitForSignal(self: network, eventName: string): customSignal
 
 	if self.Events[eventName] then return self.Events[eventName] end
 
@@ -734,7 +756,7 @@ function NetworkPrototype:WaitForSignal(eventName: string): customSignal
 end
 
 
-function NetworkPrototype:WaitForSignalWithID( signalID: number): customSignal
+function NetworkPrototype.WaitForSignalWithID(self: network, signalID: number): customSignal
 
 	local signalInfo = self.SignalArray[signalID]
 
@@ -749,34 +771,34 @@ function NetworkPrototype:WaitForSignalWithID( signalID: number): customSignal
 end
 
 
-function NetworkPrototype:DisconnectSignal(eventName: string)
+function NetworkPrototype.DisconnectSignal(self: network, eventName: string)
 	assert(self.Events[eventName], "Event " .. tostring(eventName) .. " doesn't exist.")
 	self.Events[eventName]:Disconnect()
 end
 
 
-function NetworkPrototype:ConnectSignal(eventName: string, func: func)
+function NetworkPrototype.ConnectSignal(self: network, eventName: string, func: func)
 	assert(self.Events[eventName], "Event " .. tostring(eventName) .. " doesn't exist.")
 	return self.Events[eventName]:Connect(func)
 end
 
 
-function NetworkPrototype:FireSignal(eventName: string, params: signalParams, ...: any)
+function NetworkPrototype.FireSignal(self: network, eventName: string, property: signalProperty, ...: any)
 	assert(self.Events[eventName], "Event " .. tostring(eventName) .. " doesn't exist.")
-	return self.Events[eventName]:Fire(params, ...)
+	return self.Events[eventName]:Fire(property, ...)
 end
 
 
-function NetworkPrototype:InvokeSignal(eventName: string, params: signalParams, ...: any)
+function NetworkPrototype.InvokeSignal(self: network, eventName: string, property: signalProperty, ...: any)
 
 	assert(self.Events[eventName], "Event " .. tostring(eventName) .. " doesn't exist.")
 
-	return self.Events[eventName]:Invoke(params, ...)
+	return self.Events[eventName]:Invoke(property, ...)
 
 end
 
 
-function NetworkPrototype:Destroy()
+function NetworkPrototype.Destroy(self: network)
 
 	NetworkList[Identifiers[self]] = nil
 	Identifiers[self] = nil
@@ -786,7 +808,7 @@ function NetworkPrototype:Destroy()
 end
 
 
-function NetworkPrototype:Init(): network
+function NetworkPrototype.Init(self: network): network
 
 	if self.__Init == true then return self, warn("Network already initialised.") end
 
@@ -808,6 +830,10 @@ function NetworkPrototype:Init(): network
 					for _, connection in event.Connections do
 						task.spawn(connection, unpack(args))
 					end
+					for _, thread in event.ThreadList do
+						task.spawn(thread, unpack(args))
+					end
+					table.clear(event.ThreadList)
 				end
 
 			end
@@ -887,6 +913,10 @@ function NetworkPrototype:Init(): network
 						for _, connection in event.Connections do
 							task.spawn(connection, unpack(args))
 						end
+						for _, thread in event.ThreadList do
+							task.spawn(thread, unpack(args))
+						end
+						table.clear(event.ThreadList)
 					end
 
 				end
@@ -935,7 +965,7 @@ end
 
 --// Trove Methods
 
-function TroveMethods:Add(item: Instance): Instance
+function TroveMethods.Add(self: trove, item: Instance): Instance
 
 	assert(typeof(item) == "Instance", "First argument provided must be an instance.")
 
@@ -946,7 +976,7 @@ function TroveMethods:Add(item: Instance): Instance
 end
 
 
-function TroveMethods:Set(tbl: {any}, key: any, value: any)
+function TroveMethods.Set(self: trove, tbl: {any}, key: any, value: any)
 
 	assert(type(tbl) == "table", "First argument provided must be a table.")
 	assert(key ~= nil, "Second argument (key) must be provided for table item type.")
@@ -963,7 +993,7 @@ function TroveMethods:Set(tbl: {any}, key: any, value: any)
 end
 
 
-function TroveMethods:Insert(tbl: {any}, value: any)
+function TroveMethods.Insert(self: trove, tbl: {any}, value: any)
 
 	assert(type(tbl) == "table", "First argument provided must be a table.")
 
@@ -981,7 +1011,7 @@ function TroveMethods:Insert(tbl: {any}, value: any)
 end
 
 
-function TroveMethods:Connect(key: string | RBXScriptSignal, event: RBXScriptSignal | func, func: func?): RBXScriptConnection
+function TroveMethods.Connect(self: trove, key: string | RBXScriptSignal, event: RBXScriptSignal | func, func: func?): RBXScriptConnection
 
 	if type(key) == "string" then
 
@@ -1007,7 +1037,7 @@ function TroveMethods:Connect(key: string | RBXScriptSignal, event: RBXScriptSig
 end
 
 
-function TroveMethods:CleanUp()
+function TroveMethods.CleanUp(self: trove)
 
 	for _, connection in self.ConnectionArray do
 		connection:Disconnect()
