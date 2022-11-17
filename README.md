@@ -18,7 +18,7 @@ To check the amount of data sent between the client and server, you can use the 
  - Signal can only be created from the server for the client to be able to communicate with the server with it. In the future,
    this may be adjustable.
 
-## Usage Example:
+## Usage Example (Version 0.3):
 
 ### Server
 ```lua
