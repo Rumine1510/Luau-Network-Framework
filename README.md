@@ -74,6 +74,8 @@ In the future, this module might be public but currently, it seems too messy and
 
 Oh, and here are some stats from the performance tab about the data being sent between client-server in case you want to check it out.
 
+# Tested in framework version 0.3
+
 ## Passing data at high rate
 
 ### Single remote event with identification key
