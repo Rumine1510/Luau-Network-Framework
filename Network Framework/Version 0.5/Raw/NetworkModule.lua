@@ -194,10 +194,6 @@ function Network.Register(name: string, property: networkProperty?, folder: Inst
 			newNetwork.__MainRemote = remoteEvent
 			newNetwork.__MainInvoke = remoteFunction
 
-			if property.AllowSignalRemote then
-				newNetwork.__SignalFolder = Instance.new("Folder", newNetwork.__MainFolder)
-			end
-
 		elseif IsServer then
 
 			newNetwork.__MainFolder = newNetwork._trove:Add(Instance.new("Folder"))
@@ -209,6 +205,10 @@ function Network.Register(name: string, property: networkProperty?, folder: Inst
 
 		end
 
+	end
+
+	if IsServer and property.AllowSignalRemote then
+		newNetwork.__SignalFolder = newNetwork._trove:Add(Instance.new("Folder", newNetwork.__MainFolder)) :: Folder
 	end
 
 	newNetwork._trove:Set(NetworkList,name, newNetwork)
@@ -226,8 +226,8 @@ function Network.newNetworkProperty(): networkProperty
 
 	local params = {}
 	params.AllowCrossCommunication = true :: boolean
-	params.AllowSignalRemote = false :: boolean
-	params.DefaultCreateSignalRemote = false :: boolean
+	params.AllowSignalRemote = true :: boolean
+	params.DefaultCreateSignalRemote = true :: boolean
 	params.QueueInterval = 1 :: number
 
 	return params
@@ -358,20 +358,65 @@ end
 --// Network
 
 
+function NetworkPrototype.__RegisterSignal(self: network, eventName: string, property: signalProperty, eventID: number)
+
+	assert(self.Active, "This network is no longer active.")
+	assert(self.SignalIDCount < 65537, "Signal limit reached.")
+
+	self.SignalIDCount += 1
+
+	local newSignal = Signal.new(eventID, eventName, Signal.__RegisterProperty(property))
+
+	newSignal.Network = self
+
+	newSignal._trove:Insert(self.SignalArray, newSignal.SignalInfo)
+	newSignal._trove:Set(self.Events, eventName, newSignal)
+	
+	if typeof(property.MainRemote) == "Instance" then
+
+		newSignal._trove:Connect(property.MainRemote.OnClientEvent, function(data)
+			for _, args in data do
+				newSignal:__Fired(unpack(args))
+			end
+		end)
+
+	end
+
+	if typeof(property.MainInvoke) == "Instance" then
+		
+		self._trove:Set(property.MainInvoke, "OnClientInvoke", function(...)
+
+			if newSignal.OnInvoke then
+				return newSignal.OnInvoke(...)
+			end
+
+			warn("No target for invoking, did you forget to implement OnInvoke for signal " .. self.Name .. "?")
+
+		end)
+
+	end
+
+	self._internalEvent:Fire()
+
+	return newSignal
+
+end
+
+
 function NetworkPrototype.__AddQueue(self: network, key: string, params: signalParams, args: {any})
 
 	if #self.RemoteQueue == 0 then
-		
+
 		for i = 2, self.Property.QueueInterval do
 			task.wait()
 		end
-		
+
 		if self.Property.QueueInterval == 1 then
 			task.defer(self.__ReleaseQueue, self)
 		else
 			task.spawn(self.__ReleaseQueue, self)
 		end
-		
+
 	end
 
 	local remote = {
@@ -386,7 +431,7 @@ end
 
 
 function NetworkPrototype.__ReleaseQueue(self: network)
-	
+
 	local remotes = {} :: {[string]: RemoteEvent?}
 	local data = {} :: {[Player | string]: any}
 
@@ -408,9 +453,9 @@ function NetworkPrototype.__ReleaseQueue(self: network)
 
 					if not data[player] then data[player] = {} end
 					if not data[player][remote.Key] then data[player][remote.Key] = {} end
-					
+
 					remotes[remote.Key] = property.Remote
-					
+
 					table.insert(data[player][remote.Key], remote.Args)
 					cost += #remote.Key
 
@@ -420,7 +465,7 @@ function NetworkPrototype.__ReleaseQueue(self: network)
 
 				if not data[property.Target] then data[property.Target] = {} end
 				if not data[property.Target][remote.Key] then data[property.Target][remote.Key] = {} end
-				
+
 				remotes[remote.Key] = property.Remote
 
 				table.insert(data[property.Target][remote.Key], remote.Args)
@@ -435,6 +480,8 @@ function NetworkPrototype.__ReleaseQueue(self: network)
 		else
 
 			if not data[remote.Key] then data[remote.Key] = {} end
+			
+			remotes[remote.Key] = property.Remote
 
 			table.insert(data[remote.Key], remote.Args)
 			cost += #remote.Key
@@ -444,28 +491,28 @@ function NetworkPrototype.__ReleaseQueue(self: network)
 	end
 	
 	if self.Property.AllowSignalRemote and cost + 9 > #self.RemoteQueue * 9 then
-		
+
 		if IsServer then
 
 			for player, info in data do
 
 				if typeof(player) == "Instance" and player:IsA("Player") then
-									
+
 					for key, args in info do
-						
+
 						local remote = remotes[key]
-						
+
 						if remote then
-							
+
 							remote:FireClient(player, args)
 							info[key] = nil
-							
+
 						else
-							
+
 							warn("No remote for key: " .. key)
-							
+
 						end
-						
+
 					end
 
 				else
@@ -477,11 +524,11 @@ function NetworkPrototype.__ReleaseQueue(self: network)
 			end
 
 		else
-			
+
 			for key, args in data do
-				
+
 				if type(key) == "string" then
-					
+
 					local remote = remotes[key]
 
 					if remote then
@@ -491,22 +538,22 @@ function NetworkPrototype.__ReleaseQueue(self: network)
 
 					else
 
-						warn("No remote for key: " .. key)
+						print("No remote for key: " .. key)
 
 					end
-					
+
 				else
-					
+
 					warn("Invalid key: " .. tostring(key))
-					
+
 				end
 
 			end
 
 		end
-		
+
 	end
-	
+
 	if self.__MainFolder then
 
 		if IsServer then
@@ -532,7 +579,7 @@ function NetworkPrototype.__ReleaseQueue(self: network)
 		end
 
 	end
-	
+
 	table.clear(self.RemoteQueue)
 
 end
@@ -544,35 +591,32 @@ function NetworkPrototype.__SetConnection(self: network)
 
 		self.ConnectedClient = {}
 
-		self.__MainRemote.OnServerEvent:Connect(function(player, data)
+		self._trove:Connect(self.__MainRemote.OnServerEvent, function(player, data)
 
 			for key, info in data do
 
 				local id = decodeKey(key)
 
-				local signalInfo = self.SignalArray[id] :: signalInfo?
 
-				if signalInfo then
-
-					local event = self.Events[signalInfo.EventName]
-					if not event then warn("Event " .. signalInfo.EventName .. " doesn't exist.") continue end
-
+				local signal = self:GetSignalFromID(id)
+				
+				if signal then
+					
 					for _, args in info do
 
-						event:__Fired(unpack(args))
+						signal:__Fired(player, unpack(args))
 
 					end
-
+					
 				else
-
 					warn("No signal for id: " .. id)
-
+					continue
 				end
 
 			end
 
 		end)
-		
+
 		self._trove:Set(self.__MainInvoke, "OnServerInvoke", function(player, key, ...)
 
 			if not key then
@@ -583,16 +627,16 @@ function NetworkPrototype.__SetConnection(self: network)
 				end
 
 				local returnTable = {}
-				
+
 				for _, v in self.SignalArray do
-					
+
 					if v.Signal.__Replicate then
-						
-						local info = {v.EventName :: string, v.Property :: any, v.ID :: any}
-						
+
+						local info = {v.EventName :: string, v.Property :: any, v.Key :: any}
 						table.insert(returnTable, info)
-						
+
 					end
+
 				end
 
 				return returnTable :: any
@@ -601,27 +645,21 @@ function NetworkPrototype.__SetConnection(self: network)
 
 				local id = decodeKey(key)
 
-				local signalInfo = self.SignalArray[id] :: signalInfo?
-
-				if signalInfo then
-
-					local event = self.Events[signalInfo.EventName]
-					if not event then error("Event " .. tostring(signalInfo.EventName) .. " doesn't exist.") end
-
-					if event.OnInvoke then
-						return event.OnInvoke(...)
+				local signal = self:GetSignalFromID(id)
+				if signal then
+					
+					if signal.OnInvoke then
+						return signal.OnInvoke(player, ...)
+					else
+						return warn("OnInvoke function doesn't exist for event \"" .. signal.Name .."\". Did you forget to implement OnInvoke?")
 					end
-
+					
 				else
-
-					warn("No signal for id: " .. id)
-
+					return warn("No signal for id: " .. id)
 				end
-				
-				return nil
 
 			end
-			
+
 		end)
 
 	else
@@ -634,14 +672,13 @@ function NetworkPrototype.__SetConnection(self: network)
 
 				for _, info in signalArray do
 
-					self:CreateSignal(info[1], info[2], info[3])
+					self:__RegisterSignal(info[1], info[2], decodeKey(info[3]))
 
 				end
 
 			else
 				warn("Unable to find signal array")
 			end
-
 
 			self._trove:Connect(self.__MainRemote.OnClientEvent, function(data: {[string]: {{signalInfo}}})
 
@@ -656,8 +693,24 @@ function NetworkPrototype.__SetConnection(self: network)
 
 							else
 
-								local signal = self:GetSignalFromID(signalInfo)
-								if signal then signal:Destroy() end
+								local key = signalInfo
+								local signal = self:GetSignalFromKey(key)
+
+								if signal then
+
+									for _, args in data[key] do
+
+										signal:__Fired(unpack(args))
+
+									end
+
+									data[key] = nil
+
+									if signal.Active then
+										signal:Destroy()
+									end
+
+								end
 
 							end
 
@@ -672,17 +725,21 @@ function NetworkPrototype.__SetConnection(self: network)
 
 					local id = decodeKey(key)
 
-					local signalInfo = self.SignalArray[id]
-					if not signalInfo then warn("No signal for id: " .. id) continue end
+					local signal = self:GetSignalFromID(id)
+					
+					if signal then 
+						
+						for _, args in info do
 
-					local event = self.Events[signalInfo.EventName]
-					if not event then warn("Event " .. tostring(signalInfo.EventName) .. " doesn't exist.") continue end
+							signal:__Fired(unpack(args))
 
-					for _, args in info do
-
-						event:__Fired(unpack(args))
-						table.clear(event.ThreadList)
-
+						end
+						
+					else
+						
+						warn("No signal for id: " .. id)
+						continue
+						
 					end
 
 				end
@@ -690,23 +747,24 @@ function NetworkPrototype.__SetConnection(self: network)
 				return
 
 			end)
-
+			
 
 			self._trove:Set(self.__MainInvoke, "OnClientInvoke", function(key, ...)
 
 				local id = decodeKey(key)
 
-				local signalInfo = self.SignalArray[id]
-				if not signalInfo then warn("No signal for id: " .. tostring(id)) return end
-
-				local event = self.Events[signalInfo.EventName]
-				if not event then warn("Event " .. tostring(signalInfo.EventName) .. " doesn't exist.") return end
-
-				if event.OnInvoke then
-					return event.OnInvoke(...)
+				local signal = self:GetSignalFromID(id)
+				
+				if signal then
+					
+					if signal.OnInvoke then
+						return signal.OnInvoke(...)
+					else
+						return warn("OnInvoke function doesn't exist for event \"" .. signal.Name .."\". Did you forget to implement OnInvoke?")
+					end
+					
 				else
-					warn("OnInvoke function doesn't exist for event \"" .. signalInfo.EventName .."\". Did you forget to implement OnInvoke?")
-					return
+					return warn("No signal for id: " .. id)
 				end
 
 			end)
@@ -722,7 +780,6 @@ function NetworkPrototype.__SetConnection(self: network)
 
 end
 
-
 --// Methods \\--
 
 
@@ -733,7 +790,7 @@ NetworkPrototype.newSignalProperty = Signal.newProperty
 --// Signal
 
 
-function NetworkPrototype.CreateSignal(self: network, eventName: string, property: signalProperty?, eventID: number?): customSignal
+function NetworkPrototype.CreateSignal(self: network, eventName: string, property: signalProperty?, eventID: number?)
 
 	assert(self.Active, "This network is no longer active.")
 	assert(IsServer, "Clients are only allowed to create LocalSignal.")
@@ -748,20 +805,48 @@ function NetworkPrototype.CreateSignal(self: network, eventName: string, propert
 	self.SignalIDCount += 1
 
 	local newSignal = Signal.new(eventID or self.SignalIDCount, eventName, property)
-	
 	newSignal.Network = self
-	
+
 	newSignal._trove:Insert(self.SignalArray, newSignal.SignalInfo)
 	newSignal._trove:Set(self.Events, eventName, newSignal)
 
+	local property = newSignal.Property
+
 	if self.Property.AllowSignalRemote and self.Property.DefaultCreateSignalRemote then
 
-		newSignal.__MainRemote = Instance.new("RemoteEvent", self.__SignalFolder)
-		newSignal.__MainInvoke = Instance.new("RemoteFunction", self.__SignalFolder)
+		if not property.MainRemote then
+			property.MainRemote = newSignal._trove:Add(Instance.new("RemoteEvent", self.__SignalFolder)) :: RemoteEvent
+		end
+
+		if not property.MainInvoke then
+			property.MainInvoke = newSignal._trove:Add(Instance.new("RemoteFunction", self.__SignalFolder)) :: RemoteFunction
+		end
 
 	end
 
-	self._internalEvent:Fire()
+	if typeof(property.MainRemote) == "Instance" then
+
+		newSignal._trove:Connect(property.MainRemote.OnServerEvent, function(player, data)
+			for _, args in data do
+				newSignal:__Fired(player, unpack(args))
+			end
+		end)
+
+	end
+
+	if typeof(property.MainInvoke) == "Instance" then
+
+		function property.MainInvoke.OnServerInvoke(player, ...)
+
+			if newSignal.OnInvoke then
+				return newSignal.OnInvoke(player, ...)
+			end
+
+			warn("No target for invoking, did you forget to implement OnInvoke for signal " .. self.Name .. "?")
+
+		end
+
+	end
 
 	local target = self.ConnectedClient
 
@@ -769,13 +854,15 @@ function NetworkPrototype.CreateSignal(self: network, eventName: string, propert
 		self:__AddQueue('', {Target = target}, {newSignal.SignalInfo})
 	end
 
+	self._internalEvent:Fire()
+
 	return newSignal
 
 end
 
 
 function NetworkPrototype.GetSignal(self: network, eventName: string): customSignal?
-	
+
 	assert(self.Active, "This network is no longer active.")
 	assert(type(eventName) == "string", "First argument provided must be string.")
 
@@ -796,6 +883,11 @@ function NetworkPrototype.GetSignalFromID(self: network, signalID: number): cust
 
 	return warn("Unable to find signal from id " .. signalID)
 
+end
+
+
+function NetworkPrototype.GetSignalFromKey(self: network, key: string): customSignal?
+	return self:GetSignalFromID(decodeKey(key))
 end
 
 
@@ -820,7 +912,7 @@ function NetworkPrototype.WaitForSignalWithID(self: network, signalID: number): 
 
 	assert(self.Active, "This network is no longer active.")
 	assert(signalID, "The ID provided must be a number.")
-	
+
 	local array = self.SignalArray
 	local signalInfo = array[signalID]
 
@@ -893,7 +985,7 @@ end
 --// Local Signal
 
 
-function NetworkPrototype.CreateLocalSignal(self: network, eventName: string, property: signalProperty?): customSignal
+function NetworkPrototype.CreateLocalSignal(self: network, eventName: string, property: signalProperty?)
 
 	assert(self.Active, "This network is no longer active.")
 	assert(typeof(eventName) == "string", "First argument provided must be string.")
@@ -918,12 +1010,12 @@ end
 
 
 function NetworkPrototype.GetLocalSignal(self: network, eventName: string): customSignal?
-	
+
 	assert(self.Active, "This network is no longer active.")
 	assert(typeof(eventName) == "string", "First argument provided must be string.")
 
 	return self.LocalEvents[eventName]
-	
+
 end
 
 
@@ -964,7 +1056,7 @@ function NetworkPrototype.WaitForLocalSignalWithID(self: network, signalID: numb
 
 	assert(self.Active, "This network is no longer active.")
 	assert(type(signalID) == "number", "The ID provided must be a number.")
-	
+
 	local array = self.LocalSignalArray
 	local signalInfo = array[signalID]
 
@@ -990,7 +1082,7 @@ function NetworkPrototype.ConnectLocalSignal(self: network, eventName: string, f
 end
 
 
-function NetworkPrototype.DisconnectLocalSignal(self: network, eventName: string)
+function NetworkPrototype.DisconnectLocalSignal(self: network,  eventName: string)
 
 	assert(self.Active, "This network is no longer active.")
 	assert(typeof(eventName) == "string", "First argument provided must be string.")
@@ -1038,38 +1130,38 @@ end
 
 
 function NetworkPrototype.DisconnectClient(self: network, player: Player, left: boolean)
-	
+
 	assert(IsServer, "You can only disconnect client from server.")
 	assert(typeof(player) == "Instance" and player:IsA("Player"), "First argument provided must be a player.")
-	
+
 	local connectedClient = self.ConnectedClient
-	
+
 	if type(connectedClient) == "table" then
-		
+
 		local index = table.find(connectedClient, player)
 		if index then
-			
+
 			local len = #connectedClient
 			connectedClient[index], connectedClient[len] = connectedClient[len], nil
-			
+
 			if not left then
-				
+
 			end
-			
+
 		else
 			warn("Client is not connected.")
 		end
-		
+
 	end
 
 end
 
 
 function NetworkPrototype.Disconnect(self: network)
-	
+
 	assert(not IsServer, "This method can only be called from client.")
 	print("idk")
-	
+
 end
 
 
