@@ -172,8 +172,6 @@ function Signal.new(signalID: number, signalName: string?, signalProperty: signa
 	newSignal.OnInvoke = nil :: func?
 	newSignal.Active = true :: boolean
 	
-	newSignal.__MainRemote = false :: RemoteEvent | false
-	newSignal.__MainInvoke = false :: RemoteFunction | false
 	newSignal.__Replicate = true :: boolean
 	
 	newSignal._trove = Trove.new() :: trove
@@ -190,6 +188,8 @@ function Signal.newProperty(): signalProperty
 
 	local signalProperty = {}
 	signalProperty.Once = false :: boolean
+	signalProperty.MainRemote = false :: RemoteEvent | false
+	signalProperty.MainInvoke = false :: RemoteFunction | false
 
 	lock(signalProperty)
 
@@ -212,6 +212,12 @@ function Signal.newParams(): signalParams
 
 	return newParams
 
+end
+
+
+function Signal.__RegisterProperty(property: signalProperty): signalProperty
+	SignalPropertyList[property] = true
+	return property
 end
 
 
@@ -308,13 +314,6 @@ function SignalMethods:Fire(params: signalParams?, ...: any)
 
 	end
 	
-	if addArg then
-		self:__Fired(params, ...)
-	else
-		self:__Fired(...)
-	end
-	
-
 	if self.Network and self.__Replicate then
 
 		if IsServer then
@@ -324,18 +323,22 @@ function SignalMethods:Fire(params: signalParams?, ...: any)
 
 		end
 		
-		if typeof(self.__MainRemote) == "Instance"  and self.__MainRemote:IsA("RemoteEvent") then
-			signalParams.Remote = self.__MainRemote
-		end
+		local remote = self.Property.MainRemote
 		
-		if addArg then
-			
+		if typeof(remote) == "Instance" and remote:IsA("RemoteEvent") then
+			signalParams.Remote = remote
 		end
 		
 		self.Network:__AddQueue(self.Key, signalParams, addArg and {params, ...} or {...})
 
 	end
-
+	
+	if addArg then
+		self:__Fired(params, ...)
+	else
+		self:__Fired(...)
+	end
+	
 end
 
 
@@ -343,30 +346,74 @@ function SignalMethods:Invoke(params: signalParams?, ...: any): unknown
 
 	assert(self.Active, "Signal is no longer active.")
 	
-	self = self :: customSignal
+	local signalParams, addArg
 
+	if not params or not SignalParamsList[params] then
+		signalParams = Signal.newParams()
+		addArg = true
+	else
+		signalParams = params
+	end
+	
 	if self.OnInvoke then
-
-		return self.OnInvoke(...)
+		
+		if addArg then
+			return self.OnInvoke(params, ...)
+		else
+			return self.OnInvoke(...)
+		end
 
 	elseif self.Network then
+		
+		local remote = self.Property.MainInvoke
 
 		if IsServer then
 
-			assert(params, "SignalProperty must be provided.")
-			assert(typeof(params.Target) == "Instance" and params.Target:IsA("Player"), "Target must be a player.")
-
-			return self.Network.__MainInvoke:InvokeClient(params.Target, self.Key, ...)
+			assert(typeof(signalParams.Target) == "Instance" and signalParams.Target:IsA("Player"), "Target must be a player.")
+			
+			if typeof(remote) == "Instance" and remote:IsA("RemoteFunction") then
+				
+				if addArg then
+					return remote:InvokeClient(signalParams.Target, params, ...)
+				else
+					return remote:InvokeClient(signalParams.Target, ...)
+				end
+				
+			else
+				
+				if addArg then
+					return self.Network.__MainInvoke:InvokeClient(signalParams.Target, params, self.Key, ...)
+				else
+					return self.Network.__MainInvoke:InvokeClient(signalParams.Target, self.Key, ...)
+				end
+				
+			end
 
 		else
 
-			return self.Network.__MainInvoke:InvokeServer(self.Key, ...)
+			if typeof(remote) == "Instance" and remote:IsA("RemoteFunction") then
+				
+				if addArg then
+					return remote:InvokeServer(params, ...)
+				else
+					return remote:InvokeServer(...)
+				end
+				
+			else
+				
+				if addArg then
+					return self.Network.__MainInvoke:InvokeServer(self.Key, params, ...)
+				else
+					return self.Network.__MainInvoke:InvokeServer(self.Key, ...)
+				end
+				
+			end
 
 		end
 
 	end
 
-	return warn("No target for invoking, did you forget to implement OnInvoke for signal " .. self.Name .. "?")
+	return warn("No target for invoking, did you forget to implement OnInvoke for signal " .. self.Name :: string .. "?")
 
 end
 
@@ -390,7 +437,7 @@ end
 
 function SignalMethods:Destroy()
 
-	assert(self.Active, "Signal is no longer active.")
+	if not self.Active then return warn("Signal is no longer active.") end
 
 	self:Disconnect()
 	self.Active = false
@@ -403,7 +450,7 @@ function SignalMethods:Destroy()
 
 			if type(target) == "table" and #target > 0 then
 				
-				self.Network:__AddQueue('', {Target = target}, {self.ID})
+				self.Network:__AddQueue('', {Target = target}, {self.Key})
 				
 			end
 
