@@ -40,7 +40,7 @@ end
 --// Methods
 
 
-function TroveMethods.Add(self: trove, item: Instance): Instance
+function TroveMethods.Add(self: trove, item: Instance)
 
 	assert(typeof(item) == "Instance", "First argument provided must be an instance.")
 
@@ -133,7 +133,6 @@ function TroveMethods.CleanUp(self: trove)
 	
 	if self.Parent then
 		table.clear(self.Parent)
-		setmetatable(self.Parent, nil)
 	end
 	
 end
