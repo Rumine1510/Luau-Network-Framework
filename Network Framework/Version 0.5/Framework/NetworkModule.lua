@@ -173,7 +173,7 @@ function Network.Register(name: string, property: networkProperty?, folder: Inst
 	newNetwork.SignalCount = 0 :: number
 	newNetwork.SignalIDCount = 0 :: number
 
-	newNetwork.__Init = Instance.new("BindableEvent") :: boolean | BindableEvent
+	newNetwork.__Init = false :: boolean | BindableEvent
 	newNetwork._internalEvent = Instance.new("BindableEvent")
 	newNetwork._trove = Trove.new() :: trove
 	newNetwork._trove.Parent = newNetwork
@@ -1175,11 +1175,14 @@ function NetworkPrototype.Destroy(self: network)
 end
 
 
-function NetworkPrototype.Init(self: network): network
+function NetworkPrototype:Init(): network
 
 	assert(self.Active, "This network is no longer active.")
 
-	if self.__Init == true then return self, warn("Network already initialised.") end
+	if self.__Init == true then return self end
+	if self.__Init ~= false then self.__Init.Event:Wait() return self end
+
+	self.__Init = Instance.new("BindableEvent")
 
 	if self.Property.AllowCrossCommunication then
 		self:__SetConnection()
