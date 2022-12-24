@@ -3,76 +3,16 @@
 This is a network module designed to **simplify and improve communication between client-server**.
 This module also allows for **local communication**, and will **eliminate the need to create remote instances yourself**.
 
-This module will **lower the use of bandwidth** caused by firing remote event when communicating between client-server. This effect will be especially more
-noticeable when firing multiple remote events at once. Unlike some other modules, this module does not use multiple remote instances but rather
-one RemoteEvent and RemoteFunction with an identification key that is generated automatically when you create a signal. This can be more efficient
-than using multiple remotes when the data used by the key is lower, such as using a binary string as a key, or a number. In the end there is an image
-attached about the comparison in the amount of data used.
+This module will **lower the use of bandwidth** caused by firing remote event when communicating between client-server. This effect will be more
+noticeable when firing multiple remote events at once or if you fire it often. In the end there is an image attached about the comparison in the
+amount of data used.
+
+If you compare it with other modules such as BridgeNet, this module is more optimized in the aspect of network.
 
 To check the amount of data sent between the client and server, you can use the performance tab in the studio.
 
 ## Important notes:
- - This module doesn't decrease the amount of data in the argument you passed to the client/server, only the amount caused
-   by using the identification key and firing the remote event
-
- - Signal can only be created from the server for the client to be able to communicate with the server with it. In the future,
-   this may be adjustable.
-
-## Usage Example (Version 0.3):
-
-### Server
-```lua
-local NetworkModule = require(game.ReplicatedStorage.NetworkModule)
-
-local network = NetworkModule.Register("TestNetwork"):Init() -- creating TestNetwork and Initialising it.
-
-local signalParams = network.newSignalParams() -- Optional, you can pass this in as a second argument in CreateSignal method but I won't be covering that.
-
-network:CreateSignal("Signal1"):Connect(print) -- creating a signal and connect it to print function
-
-network.Events.Signal1.OnInvoke = function(data) -- adding OnInvoke function to Signal1
-    print(data)
-    return "Received"
-end
-
-local signal2 = network:CreateSignal("Signal2") -- creating another signal
-
-signal2:Connect(function() -- connecting it to a function
-    print("Work")
-end)
-```
-
-### Client
-```lua
-local NetworkModule = require(game.ReplicatedStorage.NetworkModule)
-
-local network = NetworkModule.WaitForNetwork("TestNetwork"):Init() -- Getting TestNetwork and initialising it for client.
-
-network.Events.Signal2:Connect(function() -- Signal created from the server will exist for client, this behavior can be changed with signalParams.
-    print("This work")
-end)
-
-network:FireSignal("Signal2") -- Firing signal to server, there are multiple way to do this.
-
-local something = network.Events.Signal1:Invoke(nil, "Bye") -- Invoking server with "Bye" as an argument. Passing nil for default signal property.
-print(something) -- value returned from server
-
-network.Events.Signal1:Fire(nil, "Hello") -- Firing signal to server with argument being "Hello". Passing nil for default signal property.
-```
-
-### Output
-```lua
-This Work -- client
-Bye -- server
-Work -- server
-Received -- client
-Hello -- server
-```
-
-There are a lot more API but since this is a private module, I will just cover the basic one. Maybe I'll add more info later.
-In the future, this module might be public but currently, it seems too messy and I will probably have to improve it first.
-
-Oh, and here are some stats from the performance tab about the data being sent between client-server in case you want to check it out.
+ - This module doesn't decrease the amount of data in the argument you passed to the client/server, only the amount caused firing the remote event
 
 # Tested in framework version 0.3
 
