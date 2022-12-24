@@ -9,6 +9,8 @@ amount of data used.
 
 If you compare it with other modules such as BridgeNet, this module is more optimized in the aspect of network.
 
+There are multiple features such as ReplicatedStorage for the network, allowing you to have table that replicate to client.
+
 To check the amount of data sent between the client and server, you can use the performance tab in the studio.
 
 ## Important notes:
