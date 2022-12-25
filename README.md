@@ -5,18 +5,17 @@ This module also allows for **local communication**, and will **eliminate the ne
 
 This module will **lower the use of bandwidth** caused by firing remote event when communicating between client-server. This effect will be more
 noticeable when firing multiple remote events at once or if you fire it often. In the end there is an image attached about the comparison in the
-amount of data used.
+amount of data used. If you compare it with other modules such as BridgeNet, this module is more optimized in the aspect of network bandwidth.
 
-If you compare it with other modules such as BridgeNet, this module is more optimized in the aspect of network.
-
-There are multiple features such as ReplicatedStorage for the network, allowing you to have table that replicate to client.
-
-To check the amount of data sent between the client and server, you can use the performance tab in the studio.
+There are also multiple features such as ReplicatedStorage for the network, allowing you to have table that replicate to client.
 
 ## Important notes:
  - This module doesn't decrease the amount of data in the argument you passed to the client/server, only the amount caused firing the remote event
 
-# Tested in framework version 0.3
+# Performance benchmarking
+Tested in framework version 0.3
+
+To check the amount of data sent between the client and server, you can use the performance tab in the studio.
 
 ## Passing data at high rate
 
@@ -44,11 +43,5 @@ Send kBps: 1.1e+04
 Send kBps: 9.71e+03
 ![image](https://user-images.githubusercontent.com/105923121/202156509-aae4c162-a33e-4869-aa45-ab408a4917d6.png)
 
-So, in conclusion about the performance:
-    NetworkModule > Multiple RemoteEvent > Single RemoteEvent + Identification key
-
-As you can see, by using this module, the amount of data being sent by each remote event is lowered. This is not very noticeable unless you
-fire a lot of remotes at once, so in the aspect of lowering the bandwidth, this may not be the best. In the future, the performance will be
-improved and more adjustable. This is just the early version of the module.
-
-This is all for now, maybe I will write more later.
+As you can see, by using this module, the amount of data being sent by each remote event is lowered. This is very noticeable when you
+fire a lot of remotes at once.
