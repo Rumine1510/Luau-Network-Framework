@@ -12,8 +12,11 @@ There are also multiple features such as ReplicatedStorage for the network, allo
 ## Important notes:
  - This module doesn't decrease the amount of data in the argument you passed to the client/server, only the amount caused firing the remote event
 
-# Performance benchmarking
-Tested in framework version 0.3
+
+
+
+
+# Performance benchmarking (Tested in framework version 0.3)
 
 To check the amount of data sent between the client and server, you can use the performance tab in the studio.
 
